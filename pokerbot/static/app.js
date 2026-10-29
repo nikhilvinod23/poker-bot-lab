@@ -94,3 +94,8 @@ settingsSummary();
 $('#settings').onclick=()=>{$('#rulesettings').disabled=!!game&&!game.ended;$('#settingserror').textContent='';$('#settingspanel').showModal()};
 $('#settingsclose').onclick=()=>$('#settingspanel').close();
 $('#settingsform').onsubmit=e=>{e.preventDefault();if(!(Number($('#smallblind').value)<Number($('#bigblind').value)&&Number($('#bigblind').value)<=Number($('#startingchips').value))){$('#settingserror').textContent='Require small blind < big blind ≤ starting chips';return}localStorage.setItem('holdem-settings',JSON.stringify(Object.fromEntries(preferenceFields.map(id=>[id,$('#'+id).value]))));settingsSummary();$('#settingspanel').close();schedule()};
+
+let settingsBeforeOpen;
+const openSettings=$('#settings').onclick;
+$('#settings').onclick=()=>{settingsBeforeOpen=Object.fromEntries(preferenceFields.map(id=>[id,$('#'+id).value]));openSettings()};
+$('#settingsclose').onclick=()=>{if(settingsBeforeOpen)preferenceFields.forEach(id=>$('#'+id).value=settingsBeforeOpen[id]);$('#settingspanel').close()};
