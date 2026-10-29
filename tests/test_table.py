@@ -6,6 +6,26 @@ def seats(n):
     return [dict(name=f'B{i}',kind='bot',difficulty='easy' if i%2 else 'intermediate') for i in range(n)]
 
 class MultiplayerTests(unittest.TestCase):
+    def test_custom_raise_and_invalid_amount(self):
+        t=Table(seats(3),seed=9)
+        before=t.view()
+        with self.assertRaises(ValueError):t.action('raise',1)
+        self.assertEqual(t.view(),before)
+        t.action('raise',10)
+        self.assertEqual(t.target,12)
+        self.assertEqual(t.min_raise,10)
+        self.assertEqual(t.events[-1]['raise_by'],10)
+        self.assertEqual(t.bets[0],12)
+
+    def test_short_allin_does_not_reopen(self):
+        t=Table(seats(3),seed=9)
+        t.action('raise',10)
+        t.seats[1]['chips']=12
+        t.action('raise',1)
+        t.action('call')
+        self.assertEqual(t.current,0)
+        self.assertNotIn('raise',t.legal())
+
     def test_order_and_rotation(self):
         t=Table(seats(4),3,seed=1)
         self.assertEqual((t.dealer,t.sb,t.bb,t.current),(0,1,2,3))

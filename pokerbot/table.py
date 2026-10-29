@@ -1,4 +1,4 @@
-"""Multiplayer fixed-limit table and RLCard baseline adapters."""
+"""Multiplayer no-limit table and RLCard baseline adapters."""
 import random
 from datetime import datetime, timezone, timedelta
 from .engine import rank_hand, RANKS
@@ -60,6 +60,7 @@ class Table:
         self.bets = [0]*len(self.seats)
         self.total = [0]*len(self.seats)
         self.street, self.raises, self.target = 0, 1, 2
+        self.min_raise,self.acted_bets=2,{}
         self.sb = self.dealer if len(alive)==2 else self.after(self.dealer, alive)
         self.bb = self.after(self.sb, alive)
         self.pay(self.sb,1)
@@ -79,28 +80,39 @@ class Table:
         p = self.current
         owed = max(0, self.target-self.bets[p])
         actions = ['fold','call'] if owed else ['check']
-        size = 2 if self.street < 2 else 4
-        if self.raises < 4 and self.seats[p]['chips'] >= owed+size and any(self.seats[q]['chips'] for q in self.live if q!=p):
+        reopened = p not in self.acted_bets or self.target-self.acted_bets[p]>=self.min_raise
+        if reopened and self.seats[p]['chips'] > owed and any(self.seats[q]['chips'] for q in self.live if q!=p):
             actions.append('raise')
         return actions
 
-    def action(self, action):
+    def action(self, action, amount=None):
         if action not in self.legal():
             raise ValueError('Illegal action')
         p = self.current
+        opening = self.target == 0
+        if action=='raise':
+            maximum=self.seats[p]['chips']-max(0,self.target-self.bets[p])
+            minimum=min(self.min_raise,maximum)
+            amount=minimum if amount is None else amount
+            if type(amount) is not int or not minimum<=amount<=maximum:
+                raise ValueError(f'Raise increment must be {minimum}–{maximum}')
         before = self.seats[p]['chips']
         self.pending.discard(p)
         if action=='fold':
             self.live.remove(p)
             self.seats[p]['folded'] += 1
         elif action=='raise':
-            self.target += 2 if self.street < 2 else 4
+            self.target += amount
+            if amount>=self.min_raise:
+                self.min_raise=amount
             self.pay(p,self.target-self.bets[p])
             self.raises += 1
             self.pending = {q for q in self.live if q!=p and self.seats[q]['chips']}
         elif action=='call':
             self.pay(p,max(0,self.target-self.bets[p]))
-        self.event('action', seat=p, action=action, paid=before-self.seats[p]['chips'])
+        self.acted_bets[p]=self.target
+        self.event('action', seat=p, action='bet' if action=='raise' and opening else action, paid=before-self.seats[p]['chips'],
+                   raise_by=amount if action=='raise' else None,to=self.bets[p],street=self.street)
         self.settle_turn()
 
     def settle_turn(self):
@@ -124,6 +136,7 @@ class Table:
         self.event('board', cards=self.board[:])
         self.bets = [0]*len(self.seats)
         self.target,self.raises = 0,0
+        self.min_raise,self.acted_bets=2,{}
         self.pending = {p for p in self.live if self.seats[p]['chips']}
         self.current = self.dealer
         self.settle_turn()
@@ -155,7 +168,8 @@ class Table:
             self.seats[p]['chips']+=amount
             if amount>self.total[p]:
                 self.seats[p]['won']+=1
-        self.event('settlement', awards=awards, board=self.board[:], stacks=[s['chips'] for s in self.seats])
+        self.event('settlement', awards=awards, board=self.board[:], stacks=[s['chips'] for s in self.seats],
+                   revealed={str(p):self.hole[p][:] for p in self.live} if len(self.live)>1 and len(self.board)==5 else {})
         self.hands.append(dict(hand=self.hand, board=self.board[:], cards={str(p):c[:] for p,c in self.hole.items()}, awards=awards, contributions=self.total[:]))
         self.hand_done=True
         if self.hand>=self.limit or sum(s['chips']>0 for s in self.seats)<2:
@@ -189,10 +203,12 @@ class Table:
         return choice
 
     def view(self):
+        maximum=self.seats[self.current]['chips']-max(0,self.target-self.bets[self.current]) if not self.hand_done else 0
         return dict(hand=self.hand,limit=self.limit,dealer=self.dealer,sb=self.sb,bb=self.bb,
                     street=self.street,board=self.board, pot=0 if self.hand_done else sum(self.total),
                     current=None if self.hand_done else self.current,legal=self.legal(),
                     to_call=max(0,self.target-self.bets[self.current]) if not self.hand_done else 0,
+                    raise_min=min(self.min_raise,maximum),raise_max=maximum,
                     seats=[dict(s,seat=p,live=p in self.live,bet=0 if self.hand_done else self.bets[p],
                                 cards=self.hole.get(p,[]) if s['kind']=='human' or self.ended or (self.hand_done and p in self.live and len(self.board)==5) else ['??']*len(self.hole.get(p,[]))) for p,s in enumerate(self.seats)],
                     ended=self.ended,reason=self.reason,hand_done=self.hand_done,votes=self.votes)

@@ -42,13 +42,17 @@ class Setup(BaseModel):
 class Action(BaseModel):
     action:str
     version:int
+    amount:int|None=Field(default=None,strict=True)
 
 def load(gid):
     with database() as con:
         row=con.execute('SELECT state FROM games WHERE id=?',(gid,)).fetchone()
     if row is None:
         raise HTTPException(404,'Game not found')
-    return pickle.loads(row[0])  # Local database only; never accept uploaded pickle data.
+    game=pickle.loads(row[0])  # Local database only; never accept uploaded pickle data.
+    if not hasattr(game,'min_raise'):
+        game.min_raise,game.acted_bets=2,{}
+    return game
 
 def save(gid,game):
     with database() as con:
@@ -57,6 +61,8 @@ def save(gid,game):
 def view(gid,game):
     result=game.view()
     result.update(id=gid,version=len(game.events))
+    with database() as con:
+        result['setup']=json.loads(con.execute('SELECT setup FROM games WHERE id=?',(gid,)).fetchone()[0])
     result['events']=[{k:v for k,v in e.items() if k!='cards' or e['kind']=='board'} for e in game.events]
     if game.ended:
         result['hands']=game.hands
@@ -77,7 +83,7 @@ def create(setup:Setup):
     # Explicit CST (UTC-06:00), year-round as requested; UTC retained for interchange.
     started=datetime.now(timezone.utc)
     meta=dict(**setup.model_dump(),small_blind=1,big_blind=2,starting_chips=100,
-              started_utc=started.isoformat(),started_cst=started.astimezone(timezone(timedelta(hours=-6))).isoformat(),timezone='CST UTC-06:00',bot_base='RLCard 1.2.0 limit-holdem-rule-v1')
+              started_utc=started.isoformat(),started_cst=started.astimezone(timezone(timedelta(hours=-6))).isoformat(),timezone='CST UTC-06:00',betting='no-limit',bot_base='RLCard 1.2.0 limit-holdem-rule-v1')
     with lock,database() as con:
         con.execute('INSERT INTO games VALUES(?,?,?,?)',(gid,started.isoformat(),json.dumps(meta),pickle.dumps(game)))
     return view(gid,game)
@@ -118,7 +124,7 @@ def action(gid:str,body:Action):
             else:
                 if game.ended or game.hand_done or game.seats[game.current]['kind']!='human':
                     raise ValueError('Not your turn')
-                game.action(body.action)
+                game.action(body.action,body.amount)
         except ValueError as exc:
             raise HTTPException(422,str(exc)) from exc
         save(gid,game)

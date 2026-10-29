@@ -4,7 +4,7 @@ Install `python -m pip install -r requirements-web.txt`, then double-click `Web.
 
 Defaults: one human, one Easy bot, 20 hands, 100 chips per player, rotating 1/2 blinds. Select 1–99 hands and 1–5 bots before dealing. Disable HUMAN SEAT to watch bots; at least two seats are required. A human plus five bots seats six; bots-only allows two to five. No players can join mid-session. Click Next Hand between hands, including while spectating.
 
-Fixed-limit raises: two chips preflop/flop, four turn/river, capped at four bets per street. Short all-in calls, side pots, tied pots, odd chips, eliminated seats, and rotating live-seat blinds are handled. Short all-in raises are intentionally not available, matching the first engine's simplification.
+No-limit sizing: enter an opening bet or raise increment. A raise increment is added to the current street target; calling the outstanding amount is additional. The minimum full bet/raise starts at two chips and a full raise sets the next minimum. Stack-sized short all-ins are accepted but do not reopen betting for a player unless the cumulative increase since their action meets a full raise. Side pots, ties, odd chips, eliminated seats, and rotating live-seat blinds are handled.
 
 Bots use the installed RLCard 1.2.0 `LimitholdemRuleAgentV1`. The adapter translates cards and filters illegal actions. Easy randomly calls more often and raises less; Intermediate uses the upstream rule baseline. These are untrained heuristic difficulties, not measured skill ratings or RL models. Only the acting bot's own cards and public board are passed to the policy. The standalone upstream rule class is loaded from the installed source to avoid RLCard's registry eagerly importing unrelated games and invoking pip subprocess discovery. No upstream policy code is copied into this repository.
 
@@ -17,3 +17,9 @@ Logs are shown via LOGS or ACTION LOG. At game end, the results table, dealt-car
 This is a local app, with no accounts or multiplayer authentication. Bind to loopback; deploy behind authentication/session authorization before exposing its API publicly. Sites' Workers runtime does not host this Python backend, so no Sites deployment is claimed.
 
 Verification: `python -m unittest discover -s tests -v` (install `httpx` for API tests). Tests cover original engine, 2–6 seat simulations, order/rotation, side pots, reset conservation, bot legality, API limits, privacy, archives, version conflicts, and end agreement.
+
+## Public table and complete game archive
+
+The persistent sidebar shows public setup, blinds, board cards, actions, sizes, and payouts. It never renders hidden deal cards. Bots receive their own two cards plus public board/legal actions; they never receive other players' cards or the deck. The baseline remains RLCard's limit-poker heuristic adapted to choose minimum legal raises in this no-limit environment; the profiles are not calibrated no-limit strategies. Bot turns wait 2.2 seconds and their latest actions remain on their seat and in the sidebar.
+
+LOGS lists matches by unique game ID and start time. Opening a finished game shows configuration and final stacks, with each hand nested beneath it: all players' cards (including folds), board, public actions, and payouts. Full private histories remain unavailable until the match ends, including reset. Each SQLite row is one complete game, not one hand. Card display uses suit symbols and 10 while stored machine-readable cards retain standard T/c/d/h/s codes.

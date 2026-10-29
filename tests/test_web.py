@@ -1,8 +1,23 @@
 import unittest
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
+from pokerbot import web
 from fastapi.testclient import TestClient
 from pokerbot.web import app
 
 class WebTests(unittest.TestCase):
+    def setUp(self):
+        self.temp=tempfile.TemporaryDirectory()
+        self.dbpatch=patch.object(web,'DB',Path(self.temp.name)/'test.sqlite3')
+        self.dbpatch.start()
+        with web.database() as con:
+            con.execute('CREATE TABLE games(id TEXT PRIMARY KEY, started TEXT, setup TEXT, state BLOB)')
+
+    def tearDown(self):
+        self.dbpatch.stop()
+        self.temp.cleanup()
+
     def test_bot_game_and_archive(self):
         c=TestClient(app)
         g=c.post('/api/games',json={'human':False,'bots':['easy','intermediate'],'rounds':2}).json()
