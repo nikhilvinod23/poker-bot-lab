@@ -1,5 +1,9 @@
 # Poker Bot Lab
 
+## New: ASCII web app
+
+Run `python -m pip install -r requirements-web.txt`, then double-click `Web.cmd` and open http://127.0.0.1:8000. Configure one human and up to five RLCard-based bots, or watch a bots-only table. Easy and Intermediate are heuristic profiles. Games, actions, deals, and results are saved locally. See [web app rules and documentation](docs/WEB.md). The sections below describe the original desktop prototype.
+
 A tiny playable two-player Texas Hold'em foundation for learning game theory and building agents later. The current release is human-versus-human hotseat play: there is no bot, trained policy, poker-site connection, or money involved. One person can operate both seats to explore the game.
 
 ## Play
