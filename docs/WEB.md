@@ -23,3 +23,13 @@ Verification: `python -m unittest discover -s tests -v` (install `httpx` for API
 The persistent sidebar shows public setup, blinds, board cards, actions, sizes, and payouts. It never renders hidden deal cards. Bots receive their own two cards plus public board/legal actions; they never receive other players' cards or the deck. The baseline remains RLCard's limit-poker heuristic adapted to choose minimum legal raises in this no-limit environment; the profiles are not calibrated no-limit strategies. Bot turns wait 2.2 seconds and their latest actions remain on their seat and in the sidebar.
 
 LOGS lists matches by unique game ID and start time. Opening a finished game shows configuration and final stacks, with each hand nested beneath it: all players' cards (including folds), board, public actions, and payouts. Full private histories remain unavailable until the match ends, including reset. Each SQLite row is one complete game, not one hand. Card display uses suit symbols and 10 while stored machine-readable cards retain standard T/c/d/h/s codes.
+
+## Game numbering, time, and log controls
+
+Each match has an opaque internal ID and a persistent sequential display title, Gamer 1, Gamer 2, etc. Clearing an individual game preserves the sequence; clearing all games resets the counter to zero so the next game is Gamer 1. LOGS has controls for individual/all deletion. Deleting the active game also removes its local resume pointer.
+
+Timestamps use America/Chicago with daylight saving (CST/CDT); the browser displays dates and event times in the computer's current time zone. Earlier references above to fixed CST are superseded by this behavior. UTC is retained for interchange.
+
+Automated API checks patch the database path to a temporary directory; engine simulations write no database. Tests never create games through the live production API. Only sessions started through the normal app appear in its history.
+
+Easy now relaxes the RLCard preflop fold decision when the call is inexpensive (at most eight chips and at most roughly 12% of the remaining stack, with a two-chip floor). It overrides baseline folds 85% of the time in that inexpensive range, while retaining caution against expensive raises. Intermediate remains the upstream rule baseline. These heuristics are deliberately beginner-oriented, not solved strategy.

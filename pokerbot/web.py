@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from threading import RLock
+from zoneinfo import ZoneInfo
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -80,11 +81,15 @@ def create(setup:Setup):
     seats += [dict(name=f'BOT {i+1}',kind='bot',difficulty=d) for i,d in enumerate(setup.bots)]
     game=Table(seats,setup.rounds)
     gid=uuid.uuid4().hex
-    # Explicit CST (UTC-06:00), year-round as requested; UTC retained for interchange.
     started=datetime.now(timezone.utc)
     meta=dict(**setup.model_dump(),small_blind=1,big_blind=2,starting_chips=100,
-              started_utc=started.isoformat(),started_cst=started.astimezone(timezone(timedelta(hours=-6))).isoformat(),timezone='CST UTC-06:00',betting='no-limit',bot_base='RLCard 1.2.0 limit-holdem-rule-v1')
+              started_utc=started.isoformat(),started_local=started.astimezone(ZoneInfo('America/Chicago')).isoformat(),timezone='America/Chicago',betting='no-limit',bot_base='RLCard 1.2.0 limit-holdem-rule-v1')
     with lock,database() as con:
+        con.execute('CREATE TABLE IF NOT EXISTS counters(name TEXT PRIMARY KEY, value INTEGER NOT NULL)')
+        row=con.execute("SELECT value FROM counters WHERE name='game'").fetchone()
+        number=(row[0] if row else 0)+1
+        con.execute("INSERT OR REPLACE INTO counters VALUES('game',?)",(number,))
+        meta.update(game_number=number,title=f'Gamer {number}')
         con.execute('INSERT INTO games VALUES(?,?,?,?)',(gid,started.isoformat(),json.dumps(meta),pickle.dumps(game)))
     return view(gid,game)
 
@@ -98,6 +103,22 @@ def history():
 def state(gid:str):
     with lock:
         return view(gid,load(gid))
+
+@app.delete('/api/games')
+def clear_all():
+    with lock,database() as con:
+        con.execute('DELETE FROM games')
+        con.execute('CREATE TABLE IF NOT EXISTS counters(name TEXT PRIMARY KEY, value INTEGER NOT NULL)')
+        con.execute('DELETE FROM counters')
+    return {'cleared':True}
+
+@app.delete('/api/games/{gid}')
+def clear_one(gid:str):
+    with lock,database() as con:
+        result=con.execute('DELETE FROM games WHERE id=?',(gid,))
+        if result.rowcount==0:
+            raise HTTPException(404,'Game not found')
+    return {'cleared':True,'id':gid}
 
 @app.post('/api/games/{gid}/action')
 def action(gid:str,body:Action):

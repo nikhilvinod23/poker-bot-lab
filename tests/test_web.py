@@ -34,7 +34,20 @@ class WebTests(unittest.TestCase):
         archive=c.get(f'/api/games/{gid}/export').json()
         self.assertEqual(len(archive['hands']),2)
         self.assertEqual(sum(s['chips'] for s in archive['seats']),200)
-        self.assertIn('started_cst',archive['setup'])
+        self.assertIn('started_local',archive['setup'])
+        self.assertEqual(archive['setup']['timezone'],'America/Chicago')
+
+    def test_numbering_and_clear(self):
+        c=TestClient(app)
+        a=c.post('/api/games',json={}).json()
+        b=c.post('/api/games',json={}).json()
+        self.assertEqual(a['setup']['title'],'Gamer 1')
+        self.assertEqual(b['setup']['game_number'],2)
+        self.assertEqual(c.delete('/api/games/'+b['id']).status_code,200)
+        self.assertEqual(c.post('/api/games',json={}).json()['setup']['game_number'],3)
+        self.assertEqual(c.delete('/api/games').status_code,200)
+        self.assertEqual(c.get('/api/games').json(),[])
+        self.assertEqual(c.post('/api/games',json={}).json()['setup']['title'],'Gamer 1')
 
     def test_reset_privacy_and_validation(self):
         c=TestClient(app)

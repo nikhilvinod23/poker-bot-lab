@@ -1,6 +1,7 @@
 """Multiplayer no-limit table and RLCard baseline adapters."""
 import random
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from .engine import rank_hand, RANKS
 import ast
 from importlib.metadata import distribution
@@ -28,7 +29,7 @@ class Table:
 
     def event(self, kind, **data):
         self.events.append(dict(index=len(self.events), hand=self.hand, kind=kind,
-                                time_cst=datetime.now(timezone(timedelta(hours=-6))).isoformat(), **data))
+                                time_local=datetime.now(ZoneInfo('America/Chicago')).isoformat(), **data))
 
     def after(self, seat, pool):
         return next((seat+i) % len(self.seats) for i in range(1, len(self.seats)+1) if (seat+i) % len(self.seats) in pool)
@@ -196,7 +197,15 @@ class Table:
         if choice not in legal:
             choice='check' if 'check' in legal else 'call'
         if self.seats[p]['difficulty']=='easy':
-            if self.rng.random()<.45:
+            # Beginner is intentionally loose on inexpensive calls. Upstream's
+            # narrow preflop range otherwise folds most hands independent of size.
+            owed=max(0,self.target-self.bets[p])
+            affordable=owed<=min(8,max(2,int(.12*self.seats[p]['chips'])))
+            if 'check' in legal:
+                choice='check' if choice=='fold' else choice
+            elif choice=='fold' and affordable and self.rng.random()<.85:
+                choice='call'
+            if self.rng.random()<.25 and affordable:
                 choice='check' if 'check' in legal else 'call'
             if choice=='raise' and self.rng.random()<.65:
                 choice='check' if 'check' in legal else 'call'
