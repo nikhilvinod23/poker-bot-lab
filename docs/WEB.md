@@ -1,5 +1,17 @@
 # ASCII web table
 
+## Current hosting and settings
+
+The playable GitHub Pages build uses Pyodide 314.0.7 in a module worker to run the same Python Table and RLCard policy. GitHub Pages cannot host FastAPI; the existing FastAPI app remains the local desktop-server option. No remote game API is deployed. The Pages artifact is built from an explicit file allowlist and includes official Pyodide runtime assets and license plus the RLCard policy license. SQLite databases and logs are never included. The hosted runtime and game files are served from GitHub Pages itself, not a third-party runtime CDN.
+
+Hosted game snapshots are saved in that browser's IndexedDB. Other visitors have independent data and numbering. Clearing all logs resets only that browser's games/count; clearing site data removes them too. Logs are not synchronized across devices or between localhost and the public site. Export JSON for a separate copy. Multiple tabs coordinate reads/writes with the Web Locks API where supported. Bots receive only their own cards and public data; the device owner can inspect local runtime state with developer tools because the whole simulator runs on their device.
+
+SETTINGS edits next-game hand count (1–99), small blind, big blind, starting chips, and bot delay (0.5–10 seconds). Require small blind < big blind ≤ starting chips. Rules are fixed for an active game; bot speed can change immediately. Preferences are local to the browser. Titles are Game 1, Game 2, etc., superseding the earlier Gamer wording.
+
+The public feed appends nodes without rebuilding the sidebar. It follows new events only when already at the bottom, and keeps the reading position when scrolled up. Automatic scrolling is restricted to the feed container, with smooth scrolling disabled.
+
+Local Pages preview: download `pyodide-core-314.0.7.tar.bz2` from the official pyodide/pyodide GitHub release into ignored `runtime-cache/`, run `python scripts/build_pages.py`, and serve ignored `pages-build/` with a static HTTP server. The Pages workflow downloads and bundles this runtime automatically. Use a distinct origin/port for browser QA so no test games enter personal history. Automated API tests use a temporary database.
+
 Install `python -m pip install -r requirements-web.txt`, then double-click `Web.cmd` or run `python -m uvicorn pokerbot.web:app --host 127.0.0.1 --port 8000`. Open http://127.0.0.1:8000. The original desktop launcher is still available.
 
 Defaults: one human, one Easy bot, 20 hands, 100 chips per player, rotating 1/2 blinds. Select 1–99 hands and 1–5 bots before dealing. Disable HUMAN SEAT to watch bots; at least two seats are required. A human plus five bots seats six; bots-only allows two to five. No players can join mid-session. Click Next Hand between hands, including while spectating.

@@ -7,6 +7,16 @@ from fastapi.testclient import TestClient
 from pokerbot.web import app
 
 class WebTests(unittest.TestCase):
+    def test_settings_validation(self):
+        c=TestClient(app)
+        self.assertEqual(c.post('/api/games',json={'small_blind':5,'big_blind':2}).status_code,422)
+        self.assertEqual(c.post('/api/games',json={'starting_chips':10,'big_blind':20}).status_code,422)
+        g=c.post('/api/games',json={'small_blind':3,'big_blind':7,'starting_chips':250,'rounds':9}).json()
+        self.assertEqual(g['setup']['title'],'Game 1')
+        self.assertEqual(g['setup']['small_blind'],3)
+        self.assertEqual(g['raise_min'],7)
+        self.assertEqual(sum(s['chips'] for s in g['seats'])+g['pot'],500)
+
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()
         self.dbpatch=patch.object(web,'DB',Path(self.temp.name)/'test.sqlite3')
@@ -41,13 +51,13 @@ class WebTests(unittest.TestCase):
         c=TestClient(app)
         a=c.post('/api/games',json={}).json()
         b=c.post('/api/games',json={}).json()
-        self.assertEqual(a['setup']['title'],'Gamer 1')
+        self.assertEqual(a['setup']['title'],'Game 1')
         self.assertEqual(b['setup']['game_number'],2)
         self.assertEqual(c.delete('/api/games/'+b['id']).status_code,200)
         self.assertEqual(c.post('/api/games',json={}).json()['setup']['game_number'],3)
         self.assertEqual(c.delete('/api/games').status_code,200)
         self.assertEqual(c.get('/api/games').json(),[])
-        self.assertEqual(c.post('/api/games',json={}).json()['setup']['title'],'Gamer 1')
+        self.assertEqual(c.post('/api/games',json={}).json()['setup']['title'],'Game 1')
 
     def test_reset_privacy_and_validation(self):
         c=TestClient(app)

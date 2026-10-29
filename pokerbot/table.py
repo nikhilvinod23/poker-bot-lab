@@ -18,9 +18,10 @@ LimitholdemRuleAgentV1 = _namespace['LimitholdemRuleAgentV1']
 
 
 class Table:
-    def __init__(self, seats, limit=20, seed=None):
+    def __init__(self, seats, limit=20, seed=None, small_blind=1, big_blind=2, starting_chips=100):
         self.rng = random.Random(seed)
-        self.seats = [dict(s, chips=100, won=0, played=0, folded=0) for s in seats]
+        self.small_blind,self.big_blind,self.starting_chips=small_blind,big_blind,starting_chips
+        self.seats = [dict(s, chips=starting_chips, won=0, played=0, folded=0) for s in seats]
         self.limit, self.hand, self.dealer = limit, 0, -1
         self.events, self.hands = [], []
         self.ended, self.reason, self.hand_done = False, '', True
@@ -60,17 +61,18 @@ class Table:
         self.board, self.burned = [], []
         self.bets = [0]*len(self.seats)
         self.total = [0]*len(self.seats)
-        self.street, self.raises, self.target = 0, 1, 2
-        self.min_raise,self.acted_bets=2,{}
+        self.street, self.raises, self.target = 0, 1, self.big_blind
+        self.min_raise,self.acted_bets=self.big_blind,{}
         self.sb = self.dealer if len(alive)==2 else self.after(self.dealer, alive)
         self.bb = self.after(self.sb, alive)
-        self.pay(self.sb,1)
-        self.pay(self.bb,2)
+        self.pay(self.sb,self.small_blind)
+        self.pay(self.bb,self.big_blind)
         self.pending = {p for p in alive if self.seats[p]['chips']}
         for p in alive:
             self.seats[p]['played'] += 1
         self.start_event = len(self.events)
         self.event('deal', dealer=self.dealer, small_blind=self.sb, big_blind=self.bb,
+                   small_blind_amount=self.small_blind,big_blind_amount=self.big_blind,
                    cards={str(p): cards[:] for p,cards in self.hole.items()})
         self.current = self.bb
         self.settle_turn()
@@ -137,7 +139,7 @@ class Table:
         self.event('board', cards=self.board[:])
         self.bets = [0]*len(self.seats)
         self.target,self.raises = 0,0
-        self.min_raise,self.acted_bets=2,{}
+        self.min_raise,self.acted_bets=self.big_blind,{}
         self.pending = {p for p in self.live if self.seats[p]['chips']}
         self.current = self.dealer
         self.settle_turn()

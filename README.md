@@ -2,6 +2,8 @@
 
 ## New: ASCII web app
 
+Public playable site: https://nikhilvinod23.github.io/poker-bot-lab/ . The Pages version runs the Python engine in a browser worker and saves games only in that browser's IndexedDB. It does not call a shared game backend. Download JSON to keep a separate copy; clearing browser site data also clears that browser's games. The initial Python runtime download is cached by the browser.
+
 Run `python -m pip install -r requirements-web.txt`, then double-click `Web.cmd` and open http://127.0.0.1:8000. Configure one human and up to five RLCard-based bots, or watch a bots-only table. Easy and Intermediate are heuristic profiles. Games, actions, deals, and results are saved locally. See [web app rules and documentation](docs/WEB.md). The sections below describe the original desktop prototype.
 
 A tiny playable two-player Texas Hold'em foundation for learning game theory and building agents later. The current release is human-versus-human hotseat play: there is no bot, trained policy, poker-site connection, or money involved. One person can operate both seats to explore the game.

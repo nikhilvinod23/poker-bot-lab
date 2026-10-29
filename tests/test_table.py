@@ -6,6 +6,14 @@ def seats(n):
     return [dict(name=f'B{i}',kind='bot',difficulty='easy' if i%2 else 'intermediate') for i in range(n)]
 
 class MultiplayerTests(unittest.TestCase):
+    def test_configurable_blinds_and_stack(self):
+        t=Table(seats(3),small_blind=3,big_blind=7,starting_chips=250)
+        self.assertEqual(t.bets,[0,3,7])
+        self.assertEqual(t.min_raise,7)
+        self.assertEqual(sum(s['chips'] for s in t.seats)+sum(t.total),750)
+        t.action('call');t.action('call');t.action('check')
+        self.assertEqual(t.min_raise,7)
+
     def test_custom_raise_and_invalid_amount(self):
         t=Table(seats(3),seed=9)
         before=t.view()
