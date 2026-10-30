@@ -2,6 +2,8 @@
 
 ## Current hosting and settings
 
+At hand settlement, the public feed lists shown players' hand categories and each pot's amount, eligible players, awards, and uncalled returns. The archived hand also stores private/folded hand descriptions and best-five cards when at least five cards were available. A fold-ended hand does not fabricate a full-board result or expose folded private information in the public feed. All-in actions are labeled explicitly. Side pots use total contributions across all streets; folded contributions remain money in the pot while folded seats cannot win it. See the Python foundations guide for a worked example.
+
 The playable GitHub Pages build uses Pyodide 314.0.7 in a module worker to run the same Python Table and RLCard policy. GitHub Pages cannot host FastAPI; the existing FastAPI app remains the local desktop-server option. No remote game API is deployed. The Pages artifact is built from an explicit file allowlist and includes official Pyodide runtime assets and license plus the RLCard policy license. SQLite databases and logs are never included. The hosted runtime and game files are served from GitHub Pages itself, not a third-party runtime CDN.
 
 Hosted game snapshots are saved in that browser's IndexedDB. Other visitors have independent data and numbering. Clearing all logs resets only that browser's games/count; clearing site data removes them too. Logs are not synchronized across devices or between localhost and the public site. Export JSON for a separate copy. Multiple tabs coordinate reads/writes with the Web Locks API where supported. Bots receive only their own cards and public data; the device owner can inspect local runtime state with developer tools because the whole simulator runs on their device.

@@ -2,7 +2,7 @@
 import random
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
-from .engine import rank_hand, RANKS
+from .engine import rank_hand, hand_description, RANKS
 import ast
 from importlib.metadata import distribution
 
@@ -59,6 +59,7 @@ class Table:
             for p in alive:
                 self.hole[p].append(self.deck.pop())
         self.board, self.burned = [], []
+        self.last_pots=[]
         self.bets = [0]*len(self.seats)
         self.total = [0]*len(self.seats)
         self.street, self.raises, self.target = 0, 1, self.big_blind
@@ -115,7 +116,8 @@ class Table:
             self.pay(p,max(0,self.target-self.bets[p]))
         self.acted_bets[p]=self.target
         self.event('action', seat=p, action='bet' if action=='raise' and opening else action, paid=before-self.seats[p]['chips'],
-                   raise_by=amount if action=='raise' else None,to=self.bets[p],street=self.street)
+                   raise_by=amount if action=='raise' else None,to=self.bets[p],street=self.street,
+                   all_in=action!='fold' and self.seats[p]['chips']==0)
         self.settle_turn()
 
     def settle_turn(self):
@@ -144,36 +146,52 @@ class Table:
         self.current = self.dealer
         self.settle_turn()
 
-    def finish(self):
-        awards = [0]*len(self.seats)
+    def pot_layers(self):
+        """Slice commitments at each stack boundary; folded chips still count."""
         levels = sorted(set(self.total)-{0})
         previous = 0
+        pots=[]
         for level in levels:
             contributors = [p for p,v in enumerate(self.total) if v>=level]
             amount = (level-previous)*len(contributors)
             previous=level
             eligible = [p for p in self.live if self.total[p]>=level]
-            if len(contributors)==1:
-                winners=contributors
+            refund=len(contributors)==1
+            pots.append(dict(name='Uncalled return' if refund else 'Main pot' if not pots else f'Side pot {len(pots)}',amount=amount,contributors=contributors,eligible=eligible,refund=refund))
+        return pots
+
+    def finish(self):
+        awards = [0]*len(self.seats)
+        self.last_pots=self.pot_layers()
+        for pot in self.last_pots:
+            amount,eligible=pot['amount'],pot['eligible']
+            if pot['refund']:
+                winners=pot['contributors']
             elif len(self.live)==1:
                 winners=list(self.live)
             elif not eligible:
-                # Only unmatched folded commitments; retain money among contributors.
-                winners=contributors
+                raise ValueError('Contested pot has no eligible player')
             else:
                 ranks={p:rank_hand(self.board+self.hole[p]) for p in eligible}
                 winners=[p for p,r in ranks.items() if r==max(ranks.values())]
             ordered=sorted(winners,key=lambda p:(p-self.dealer-1)%len(self.seats))
             share,odd=divmod(amount,len(ordered))
+            pot['awards']={}
             for j,p in enumerate(ordered):
-                awards[p]+=share+(j<odd)
+                value=share+(j<odd)
+                awards[p]+=value
+                pot['awards'][str(p)]=value
         for p,amount in enumerate(awards):
             self.seats[p]['chips']+=amount
             if amount>self.total[p]:
                 self.seats[p]['won']+=1
+        descriptions={str(p):hand_description(self.board+cards) if len(self.board+cards)>=5 else dict(label='No five-card hand',rank=[],best_five=[]) for p,cards in self.hole.items()}
+        showdown=len(self.live)>1 and len(self.board)==5
+        public_types={str(p):descriptions[str(p)] if showdown and p in self.live else dict(label='Folded — not shown' if p not in self.live else 'Won by fold — not shown') for p in self.hole}
         self.event('settlement', awards=awards, board=self.board[:], stacks=[s['chips'] for s in self.seats],
+                   pots=self.last_pots,hand_types=public_types,
                    revealed={str(p):self.hole[p][:] for p in self.live} if len(self.live)>1 and len(self.board)==5 else {})
-        self.hands.append(dict(hand=self.hand, board=self.board[:], cards={str(p):c[:] for p,c in self.hole.items()}, awards=awards, contributions=self.total[:]))
+        self.hands.append(dict(hand=self.hand, board=self.board[:], cards={str(p):c[:] for p,c in self.hole.items()}, awards=awards, contributions=self.total[:],pots=self.last_pots,hand_types=descriptions))
         self.hand_done=True
         if self.hand>=self.limit or sum(s['chips']>0 for s in self.seats)<2:
             self.end('round limit' if self.hand>=self.limit else 'last player')
@@ -216,6 +234,7 @@ class Table:
     def view(self):
         maximum=self.seats[self.current]['chips']-max(0,self.target-self.bets[self.current]) if not self.hand_done else 0
         return dict(hand=self.hand,limit=self.limit,dealer=self.dealer,sb=self.sb,bb=self.bb,
+                    pots=getattr(self,'last_pots',[]) if self.hand_done else self.pot_layers(),
                     street=self.street,board=self.board, pot=0 if self.hand_done else sum(self.total),
                     current=None if self.hand_done else self.current,legal=self.legal(),
                     to_call=max(0,self.target-self.bets[self.current]) if not self.hand_done else 0,

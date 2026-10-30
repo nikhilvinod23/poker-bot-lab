@@ -42,6 +42,21 @@ def rank_hand(cards):
     return max(rank_five(c) for c in combinations(cards, 5))
 
 
+def hand_description(cards):
+    """Return a readable name and best five cards without changing game state."""
+    best=max(combinations(cards,5),key=rank_five)
+    score=rank_five(best)
+    names={2:'two',3:'three',4:'four',5:'five',6:'six',7:'seven',8:'eight',9:'nine',10:'ten',11:'jack',12:'queen',13:'king',14:'ace'}
+    plural=lambda value: names[value]+('es' if value==6 else 's')
+    top=names[score[1]]
+    labels={0:lambda:f'{top.capitalize()} high',1:lambda:f'Pair of {plural(score[1])}',
+            2:lambda:f'Two pair: {plural(score[1])} and {plural(score[2])}',
+            3:lambda:f'Three of a kind: {plural(score[1])}',4:lambda:f'Straight, {top} high',
+            5:lambda:f'Flush, {top} high',6:lambda:f'Full house: {plural(score[1])} over {plural(score[2])}',
+            7:lambda:f'Four of a kind: {plural(score[1])}',8:lambda:'Royal flush' if score[1]==14 else f'Straight flush, {top} high'}
+    return dict(label=labels[score[0]](),rank=list(score),best_five=list(best))
+
+
 class Game:
     """One hand. Actions: fold, check, call, raise. Seats are 0 and 1.
 

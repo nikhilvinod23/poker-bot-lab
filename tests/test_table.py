@@ -73,6 +73,51 @@ class MultiplayerTests(unittest.TestCase):
         t.live={0,1,2}
         t.finish()
         self.assertEqual([s['chips'] for s in t.seats],[120,110,70])
+        self.assertEqual([p['amount'] for p in t.last_pots],[30,40,30])
+        self.assertEqual(t.last_pots[0]['awards'],{'0':30})
+        self.assertEqual(t.last_pots[1]['awards'],{'1':40})
+        self.assertTrue(t.last_pots[2]['refund'])
+        self.assertEqual(t.events[-1]['hand_types']['0']['label'],'Pair of aces')
+
+    def test_three_contested_pots_and_folded_privacy(self):
+        for folded in (False,True):
+            t=Table(seats(4))
+            t.board='2c 3d 7h 9s Jc'.split()
+            t.hole={0:['7c','7d'],1:['Kc','Kd'],2:['Qc','Qd'],3:['Tc','Td']}
+            t.total=[20,50,80,80]
+            for p,v in enumerate(t.total):t.seats[p]['chips']=100-v
+            t.live={0,2,3} if folded else {0,1,2,3}
+            t.finish()
+            self.assertEqual([p['amount'] for p in t.last_pots],[80,90,60])
+            self.assertEqual(sum(s['chips'] for s in t.seats),400)
+            self.assertEqual([s['chips'] for s in t.seats],[160,50,170,20] if folded else [160,140,80,20])
+            self.assertEqual(t.hands[-1]['hand_types']['1']['label'],'Pair of kings')
+            if folded:self.assertEqual(t.events[-1]['hand_types']['1'],{'label':'Folded — not shown'})
+
+    def test_tied_pot_odd_chip(self):
+        t=Table(seats(3))
+        t.board='Tc Jc Qc Kc Ac'.split()
+        t.hole={0:['2d','3d'],1:['4d','5d'],2:['6d','7d']}
+        t.total=[1,2,2];t.live={1,2}
+        for p,v in enumerate(t.total):t.seats[p]['chips']=100-v
+        t.finish()
+        self.assertEqual([s['chips'] for s in t.seats],[99,101,100])
+        self.assertEqual(t.events[-1]['hand_types']['1']['label'],'Royal flush')
+
+    def test_allin_action_sequence_builds_side_pots(self):
+        t=Table(seats(4),seed=81)
+        for p,stack in enumerate([50,80,80,20]):t.seats[p]['chips']=stack-t.total[p]
+        t.action('raise',18)
+        t.action('call')
+        t.action('raise',30)
+        t.action('raise',30)
+        t.action('call')
+        t.action('call')
+        self.assertTrue(t.hand_done)
+        self.assertEqual(t.total,[50,80,80,20])
+        self.assertEqual([p['amount'] for p in t.last_pots],[80,90,60])
+        self.assertEqual(sum(s['chips'] for s in t.seats),230)
+        self.assertEqual(sum(e.get('all_in',False) for e in t.events),4)
 
     def test_reset_refunds(self):
         t=Table(seats(6))
