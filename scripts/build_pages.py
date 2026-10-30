@@ -2,6 +2,7 @@
 import ast
 import shutil
 import tarfile
+import hashlib
 from importlib.metadata import distribution
 from pathlib import Path
 
@@ -12,6 +13,10 @@ static=root/'pokerbot'/'static'
 for name in ('index.html','style.css','sidebar.css','app.js'):
     shutil.copyfile(static/name,out/name)
 html=(out/'index.html').read_text(encoding='utf-8').replace('/static/','./')
+# A new layout gets new asset URLs, including on phones with cached CSS/JS.
+revision=hashlib.sha256(b''.join((static/name).read_bytes() for name in ('index.html','style.css','sidebar.css','app.js'))+(root/'pages-runtime'/'browser-runtime.js').read_bytes()).hexdigest()[:12]
+for asset in ('style.css','sidebar.css','app.js','browser-runtime.js'):
+    html=html.replace(f'./{asset}"',f'./{asset}?v={revision}"')
 (out/'index.html').write_text(html,encoding='utf-8')
 for name in ('browser-runtime.js','python-worker.js'):
     shutil.copyfile(root/'pages-runtime'/name,out/name)
